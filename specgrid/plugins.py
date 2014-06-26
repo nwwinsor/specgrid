@@ -4,6 +4,7 @@ import numpy as np
 
 import astropy.units as u
 import astropy.constants as const
+from astropy import log
 
 from specutils import Spectrum1D
 
@@ -71,28 +72,28 @@ class Convolve(object):
     """
     parameters = []
 
-    def __init__(self,resolution, central_wavelength):
+    def __init__(self, resolution, central_wavelength):
         self.resolution = resolution
         self.central_wavelength = central_wavelength
 
-    def __call__(self,spectrum):
+    def __call__(self, spectrum):
         R = self.resolution
         Lambda = self.central_wavelength.value
-        wavelength = spectrum.dispersion.value
+        wavelength = spectrum.wavelength.value
         
         conversionfactor = 2 * np.sqrt(2 * np.log(2))
-        deltax = np.mean(wavelength[1:] -wavelength[0:-1])
-        FWHM = Lambda/R
-        sigma = (FWHM/deltax)/conversionfactor
+        deltax = np.mean(wavelength[1:] - wavelength[0:-1])
+        FWHM = Lambda / R
+        sigma = (FWHM / deltax) / conversionfactor
         
         flux = spectrum.flux
 
         convolved_flux = gaussian_filter1d(flux, sigma, axis = 0, order = 0)
 
         return Spectrum1D.from_array(
-            spectrum.dispersion,
+            spectrum.wavelength.value,
             convolved_flux,
-            dispersion_unit = spectrum.dispersion.unit,
+            dispersion_unit = spectrum.wavelength.unit,
             unit = spectrum.unit)
 
 
@@ -105,23 +106,27 @@ class Interpolate(object):
     ----------
     observed: Spectrum1D object
         This is the observed spectrum which you want to interpolate your (model) spectrum to.
+    
+    Caution
+    -------
+    If you end up with an interpolated flux array with constant values, that is a result of how np.interp reacts when the wavelength ranges are not proper. Switching the units to be the same is a (partial) solution to this.
     """
 
     parameters = []
 
     def __init__(self, observed):
         self.observed = observed
-
+            
     def __call__(self, spectrum):
-        wavelength, flux = spectrum.wavelength.value, spectrum.flux
+        if self.observed.wavelength.unit != spectrum.wavelength.unit:
+            log.warning('"observed wavelength" and "spectrum wavelength" do not share the same units ({0} vs {1}). The units of "spectrum wavelength" will be converted to the units of "observed wavelength".'.format(observed_wavelength.unit, wavelength.unit))
+        else:
+            pass
         
-        interpolated_flux = np.interp(self.observed.wavelength.value,
-                                      wavelength, flux)
-        return Spectrum1D.from_array(
-            self.observed.wavelength,
-            interpolated_flux,
-            dispersion_unit = self.observed.wavelength.unit,
-            unit = self.observed.unit)
+        wavelength, flux = spectrum.wavelength.to(u.Unit(self.observed.wavelength.unit)), spectrum.flux
+        interpolated_flux = np.interp(self.observed.wavelength.value, wavelength.value, flux)
+                                      
+            return Spectrum1D.from_array(self.observed.wavelength.value, interpolated_flux, dispersion_unit = self.observed.wavelength.unit, unit = self.observed.unit)
 
 
 class CCM89Extinction(object):
@@ -135,14 +140,14 @@ class CCM89Extinction(object):
 
         from specutils import extinction
 
-        extinction_factor = 10**(-0.4*extinction.extinction_ccm89(
-            spectrum.wavelength, a_v=self.a_v, r_v=self.r_v))
+        extinction_factor = 10**(-0.4 * extinction.extinction_ccm89(
+            spectrum.wavelength, a_v = self.a_v, r_v = self.r_v))
 
 
         return Spectrum1D.from_array(
             spectrum.wavelength.value,
             extinction_factor * spectrum.flux,
-            dispersion_unit=spectrum.wavelength.unit, unit=spectrum.unit)
+            dispersion_unit = spectrum.wavelength.unit, unit = spectrum.unit)
 
 
 
@@ -176,7 +181,7 @@ def observe(model, wgrid, slit, seeing, overresolve, offset=0.):
     filtgrid = np.arange(-filthalfsize,filthalfsize+1)*wgridres
     # sigma ~ seeing-fwhm/sqrt(8*ln(2.))
     filtsig = seeing/np.sqrt(8.*np.log(2.))
-    filt = np.exp(-0.5*((filtgrid-offset)/filtsig)**2)
+    filt = np.exp(-0.5*((filtgrid - offset)/filtsig)**2)
     filt /= filt.sum()
     # convolve with pixel width
     filtextra = int((overresolve-1)/2+0.5)
@@ -184,4 +189,4 @@ def observe(model, wgrid, slit, seeing, overresolve, offset=0.):
     filt = nd.convolve1d(filt, np.ones(overresolve)/overresolve)
     mint = np.interp(wgrid, model['w'], model['flux'])
     mconv = nd.convolve1d(mint, filt)
-    return Table([wgrid, mconv], names=('w','flux'), meta={'filt': filt})
+    return Table([wgrid, mconv], names = ('w','flux'), meta = {'filt': filt})
