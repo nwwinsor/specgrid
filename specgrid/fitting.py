@@ -461,4 +461,4 @@ def fit_spectrum_test(spectrum, guess, model_star, fitter='leastsq',
         stellar_params_uncertainty = OrderedDict(
             (key, None) for key, par in zip(guess.keys(), fit['x']))
 
-    return stellar_params, stellar_params_uncertainty, fit, function_value
+    return stellar_params, stellar_params_uncertainty, fit, function_value if fitter = 'basinhopping' else stellar_params, stellar_params_uncertainty, fit
