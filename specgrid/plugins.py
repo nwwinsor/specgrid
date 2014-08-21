@@ -109,7 +109,7 @@ class Interpolate(object):
     
     Caution
     -------
-    If you end up with an interpolated flux array with constant values, that is a result of how np.interp reacts when the wavelength ranges are not proper. Switching the units to be the same is a (partial) solution to this.
+    If you end up with an interpolated flux array with constant values, that is a likely result of how np.interp reacts when the wavelength ranges are not proper. Switching the units to be the same is a (partial) solution to this.
     """
 
     parameters = []
@@ -124,9 +124,20 @@ class Interpolate(object):
             pass
         
         wavelength, flux = spectrum.wavelength.to(u.Unit(self.observed.wavelength.unit)), spectrum.flux
+        if (self.observed.wavelength[0] <= wavelength[0] <= self.observed.wavelength[-1]) or (self.observed.wavelength[0] <= wavelength[-1] <= self.observed.wavelength[-1]) is False:
+            if (wavelength[0] <= self.observed.wavelength[0] <= wavelength[-1]) or (wavelength[0] <= self.observed.wavelength[-1] <= wavelength[-1]) is True:
+                pass
+            elif (wavelength[0] <= self.observed.wavelength[0] <= wavelength[-1]) or (wavelength[0] <= self.observed.wavelength[-1] <= wavelength[-1]) is False:
+                raise ValueError('"observed wavelength" and "spectrum wavelength" do not overlap on any wavelength range. This needs to be resolved.')
+            else:
+                pass
+        elif (self.observed.wavelength[0] <= wavelength[0] <= self.observed.wavelength[-1]) or (self.observed.wavelength[0] <= wavelength[-1] <= self.observed.wavelength[-1]) is True:
+            log.warning('"spectrum wavelength" does not span the entire range of "observed wavelength". This needs to be checked.')
+        else:
+            pass
+
         interpolated_flux = np.interp(self.observed.wavelength.value, wavelength.value, flux)
-                                      
-            return Spectrum1D.from_array(self.observed.wavelength.value, interpolated_flux, dispersion_unit = self.observed.wavelength.unit, unit = self.observed.unit)
+        return Spectrum1D.from_array(self.observed.wavelength.value, interpolated_flux, dispersion_unit = self.observed.wavelength.unit, unit = self.observed.unit)
 
 
 class CCM89Extinction(object):
