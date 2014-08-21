@@ -96,6 +96,62 @@ class Convolve(object):
             dispersion_unit = spectrum.wavelength.unit,
             unit = spectrum.unit)
 
+class Normalize(object):
+    """Normalize a model spectrum to an observed one using a polynomial
+
+    Parameters
+    ----------
+    observed : Spectrum1D object
+        The observed spectrum to which the model should be matched
+    npol : int
+        The degree of the polynomial
+    fill_value: float
+        This can be used to take model spectra with all Nan fluxes and change them into fluxes will all very high float values.
+    """
+
+    parameters = []
+
+    def __init__(self, observed, npol, fill_value=1e99):
+        if getattr(observed, 'uncertainty', None) is None:
+            self.uncertainty = 1.
+        else:
+            self.uncertainty = getattr(observed.uncertainty, 'array',
+                                       observed.uncertainty)
+        self.fill_value = fill_value
+        self.signal_to_noise = observed.flux / self.uncertainty
+        self.flux_unit = observed.unit
+        self._rcond = (len(observed.flux) *
+                       np.finfo(observed.flux.dtype).eps)
+        self._Vp = np.polynomial.polynomial.polyvander(
+            observed.wavelength/observed.wavelength.mean() - 1., npol)
+        self.domain = u.Quantity([observed.wavelength.min(),
+                                  observed.wavelength.max()])
+        self.window = self.domain/observed.wavelength.mean() - 1.
+
+    def __call__(self, model):
+        # V[:,0]=mfi/e, Vp[:,1]=mfi/e*w, .., Vp[:,npol]=mfi/e*w**npol
+        if np.isnan(model.flux[0]):
+            model_flux = np.ones_like(model.flux) * self.fill_value
+        else:
+            model_flux = model.flux
+        V = self._Vp * (model_flux / self.uncertainty)[:, np.newaxis]
+        # normalizes different powers
+        scl = np.sqrt((V*V).sum(0))
+        sol, resids, rank, s = np.linalg.lstsq(V/scl, self.signal_to_noise,
+                                               self._rcond)
+        sol = (sol.T / scl).T
+        if rank != self._Vp.shape[-1] - 1:
+            msg = "The fit may be poorly conditioned"
+            warnings.warn(msg)
+
+        fit = np.dot(V, sol) * self.uncertainty
+        # keep coefficients in case the outside wants to look at it
+        self.polynomial = Polynomial(sol, domain=self.domain.value,
+                                     window=self.window.value)
+        return Spectrum1D.from_array(
+            model.wavelength.value,
+            fit, unit=self.flux_unit,
+            dispersion_unit=model.wavelength.unit)
 
 class Interpolate(object):
 
