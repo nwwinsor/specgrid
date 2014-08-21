@@ -106,6 +106,8 @@ class Interpolate(object):
     ----------
     observed: Spectrum1D object
         This is the observed spectrum which you want to interpolate your (model) spectrum to.
+    fill_value: float
+        This can be used to take model spectra with all Nan fluxes and change them into fluxes will all very high float values.
     
     Caution
     -------
@@ -114,8 +116,9 @@ class Interpolate(object):
 
     parameters = []
 
-    def __init__(self, observed):
+    def __init__(self, observed, fill_value=1e99):
         self.observed = observed
+        self.fill_value = fill_value
             
     def __call__(self, spectrum):
         if self.observed.wavelength.unit != spectrum.wavelength.unit:
@@ -137,6 +140,10 @@ class Interpolate(object):
             pass
 
         interpolated_flux = np.interp(self.observed.wavelength.value, wavelength.value, flux)
+        if np.isnan(interpolated_flux[0]):
+            interpolated_flux = np.ones_like(interpolated_flux) * self.fill_value
+        else:
+            pass
         return Spectrum1D.from_array(self.observed.wavelength.value, interpolated_flux, dispersion_unit = self.observed.wavelength.unit, unit = self.observed.unit)
 
 
