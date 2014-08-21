@@ -69,12 +69,15 @@ class Convolve(object):
         resolution R defined as lambda / delta lambda.
     central_wavelength: quantity
         the middle of the bandpass of interest.
+    fill_value: float
+        This can be used to take model spectra with all Nan fluxes and change them into fluxes will all very high float values.
     """
     parameters = []
 
-    def __init__(self, resolution, central_wavelength):
+    def __init__(self, resolution, central_wavelength, fill_value=1e99):
         self.resolution = resolution
         self.central_wavelength = central_wavelength
+        self.fill_value = fill_value
 
     def __call__(self, spectrum):
         R = self.resolution
@@ -86,9 +89,12 @@ class Convolve(object):
         FWHM = Lambda / R
         sigma = (FWHM / deltax) / conversionfactor
         
-        flux = spectrum.flux
-
-        convolved_flux = gaussian_filter1d(flux, sigma, axis = 0, order = 0)
+        if np.isnan(spectrum.flux[0]):
+            flux = np.ones_like(spectrum.flux) * self.fill_value
+            convolved_flux = flux
+        else:
+            flux = spectrum.flux
+            convolved_flux = gaussian_filter1d(flux, sigma, axis = 0, order = 0)
 
         return Spectrum1D.from_array(
             spectrum.wavelength.value,
