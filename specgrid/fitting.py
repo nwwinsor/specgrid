@@ -372,8 +372,7 @@ class Print_Function(object):
 
 
 
-def fit_spectrum_test(spectrum, guess, model_star, fitter='leastsq',
-                 fill_value=1e99, valid_slice=slice(None)):
+def fit_spectrum_test(spectrum, guess, model_star, fitter='leastsq', bounds = None, take_step = None, print_fun = None, fill_value=1e99, valid_slice=slice(None)):
     """
     This function is used for fitting model spectral to an observed spectra.
 
@@ -384,13 +383,19 @@ def fit_spectrum_test(spectrum, guess, model_star, fitter='leastsq',
     guess: dictionary
         These is a dictionary of the initial guess values for the parameters being fit. 
     model_star: ModelStar class object
-        This is the grid of model spectra (possibly with 'plugins' applied to them) being fit to the observed spectra. 
+        This is the grid of model spectra (possibly with 'plugins' applied to them) being fit to the observed spectra.
+    bounds: list (like: [(minlogg, maxlogg), (minteff, maxteff), (minfeh, maxfeh)]
+        This is used for the basinhopping fitting routine. It acts as bounds for the grid. Order is important.
+    take_step: RandomDisplacementBounds class object
+        This is used for the basinhopping fitting routine. It gives basinhopping bounds as well as stepsizes for each variable.
+    print_fun: Print_Function class object
+        This is used for the basinhopping fitting routine. It tells basinhopping to print out each minimum found while fitting.
     fitter: string
         This is the desired fitting method. The two built-in fitters include: leastsq and basinhopping
     fill_value: float
         This is used to avoid issues with "Nan" values
-    valid_slice:
-        
+    valid_slice: ???
+        ???
     """
     if getattr(spectrum, 'uncertainty', None) is not None:
         uncertainty = spectrum.uncertainty.array
